@@ -12,6 +12,23 @@ class RbacSeeder extends Seeder
 {
     public function run(): void
     {
+        foreach (['report.view','report.create','report.update','report.delete'] as $p) {
+            Permission::firstOrCreate(['name' => $p, 'guard_name' => 'web']);
+        }
+
+
+        $sectionPerms = [
+            // Seção 1 – Informações Gerais
+            'report.section.informacoes_gerais.view',
+            'report.section.informacoes_gerais.fill',
+            // Seção 2 – Equipe
+            'report.section.equipe.view',
+            'report.section.equipe.fill',
+        ];
+        foreach ($sectionPerms as $p) {
+            Permission::firstOrCreate(['name' => $p, 'guard_name' => 'web']);
+        }
+
         // Departamentos iniciais
         $ti = Department::firstOrCreate(['name' => 'TI'], ['description' => 'Tecnologia da Informação']);
         $rh = Department::firstOrCreate(['name' => 'RH']);
