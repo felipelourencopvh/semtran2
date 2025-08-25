@@ -33,5 +33,14 @@ class Report extends Model
     {
         return $this->hasMany(\App\Models\RelatorioAtividade::class, 'report_id')->orderBy('ordem');
     }
+    public function equipamentos()
+    {
+        return $this->hasMany(\App\Models\RelatorioEquipamento::class, 'report_id')->orderBy('ordem');
+    }
+    public function condutores()
+    {
+        return $this->hasMany(\App\Models\RelatorioCondutor::class, 'report_id')->orderBy('ordem');
+    }
+
 
 }
