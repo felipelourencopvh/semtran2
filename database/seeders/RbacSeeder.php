@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
 use App\Models\User;
 use App\Models\Department;
 
@@ -12,62 +13,78 @@ class RbacSeeder extends Seeder
 {
     public function run(): void
     {
-        foreach (['report.view','report.create','report.update','report.delete'] as $p) {
-            Permission::firstOrCreate(['name' => $p, 'guard_name' => 'web']);
-        }
+        // 1) Permissões base (Relatórios)
+        $reportPerms = [
+            'report.view', 'report.create', 'report.update', 'report.delete',
+        ];
 
-
+        // 2) Permissões de seções do relatório
         $sectionPerms = [
             // Seção 1 – Informações Gerais
             'report.section.informacoes_gerais.view',
             'report.section.informacoes_gerais.fill',
+
             // Seção 2 – Equipe
             'report.section.equipe.view',
             'report.section.equipe.fill',
+
+            // Seção 3 – Descrição das Atividades (NOVA)
+            'report.section.descricao_atividades.view',
+            'report.section.descricao_atividades.fill',
         ];
-        foreach ($sectionPerms as $p) {
-            Permission::firstOrCreate(['name' => $p, 'guard_name' => 'web']);
-        }
 
-        // Departamentos iniciais
-        $ti = Department::firstOrCreate(['name' => 'TI'], ['description' => 'Tecnologia da Informação']);
-        $rh = Department::firstOrCreate(['name' => 'RH']);
-
-        // Permissões (nomes simples e consistentes)
-        $perms = [
+        // 3) Outras permissões do sistema
+        $systemPerms = [
             'user.view', 'user.create', 'user.update', 'user.delete',
             'department.view', 'department.create', 'department.update', 'department.delete',
-            // adicione módulos do seu sistema aqui...
         ];
 
-        foreach ($perms as $p) {
+        // Criar todas as permissões (guard web)
+        $allPerms = array_unique([...$reportPerms, ...$sectionPerms, ...$systemPerms]);
+        foreach ($allPerms as $p) {
             Permission::firstOrCreate(['name' => $p, 'guard_name' => 'web']);
         }
 
-        // Perfis (roles)
-        $admin = Role::firstOrCreate(['name' => 'admin', 'guard_name' => 'web']);
+        // 4) Departamentos iniciais
+        $ti = Department::firstOrCreate(['name' => 'TI'], ['description' => 'Tecnologia da Informação']);
+        Department::firstOrCreate(['name' => 'RH'], ['description' => 'Recursos Humanos']);
+
+        // 5) Perfis (roles)
+        $admin  = Role::firstOrCreate(['name' => 'admin',  'guard_name' => 'web']);
         $gestor = Role::firstOrCreate(['name' => 'gestor', 'guard_name' => 'web']);
 
-        // Admin tem tudo
-        $admin->syncPermissions(Permission::all());
+        // Admin tem tudo (todas as permissões web)
+        $admin->syncPermissions(Permission::where('guard_name', 'web')->get());
 
-        // Gestor tem apenas visualizar e atualizar usuários/departamentos (exemplo)
+        // Gestor: exemplo com permissões mais restritas
         $gestorPerms = Permission::whereIn('name', [
             'user.view','user.update',
             'department.view','department.update',
+            // Relatório (apenas visualizar e editar conteúdo, sem apagar/criar)
+            'report.view','report.update',
+            // Pode ver/preencher Informações Gerais e Equipe (ajuste conforme sua política)
+            'report.section.informacoes_gerais.view',
+            'report.section.informacoes_gerais.fill',
+            'report.section.equipe.view',
+            'report.section.equipe.fill',
+            // Pode VER a nova seção; se quiser permitir preencher, adicione a linha abaixo:
+            'report.section.descricao_atividades.view',
+            // 'report.section.descricao_atividades.fill',
         ])->get();
         $gestor->syncPermissions($gestorPerms);
 
-        // Vincular um usuário admin (ajuste o email)
-        $user = User::where('email', 'admin@semtran.local')->first();
-        if (! $user) {
-            $user = User::create([
+        $user = User::firstOrCreate(
+            ['email' => 'admin@semtran.local'],
+            [
                 'name' => 'Administrador',
-                'email' => 'admin@semtran.local',
                 'password' => bcrypt('secret123'),
                 'department_id' => $ti->id,
-            ]);
+            ]
+        );
+        if (! $user->hasRole('admin')) {
+            $user->assignRole($admin);
         }
-        $user->syncRoles([$admin]);
+
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
     }
 }

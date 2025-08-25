@@ -144,18 +144,32 @@ class ReportResource extends Resource
                                 'extraordinario' => 'Extraordinário',
                             ])
                             ->required()
+                            ->dehydrated(true) // garante que o valor permanece no estado após salvar
+                            ->afterStateHydrated(function ($component, ?\App\Models\Report $record) {
+                                if ($record) {
+                                    $component->state($record->service_type);
+                                }
+                            })
                             ->disabled(fn () => ! self::canFill('informacoes_gerais')),
+
                         Select::make('shift')
                             ->label('Turno')
                             ->options([
                                 'plantao' => 'Plantão',
-                                'manha' => 'Manhã',
-                                'tarde' => 'Tarde',
-                                'noite' => 'Noite',
+                                'manha'   => 'Manhã',
+                                'tarde'   => 'Tarde',
+                                'noite'   => 'Noite',
                             ])
                             ->required()
+                            ->dehydrated(true)
+                            ->afterStateHydrated(function ($component, ?\App\Models\Report $record) {
+                                if ($record) {
+                                    $component->state($record->shift);
+                                }
+                            })
                             ->disabled(fn () => ! self::canFill('informacoes_gerais')),
-                    ]),
+                    ])
+
                 ]),
 
             // Seção 2 — Equipe
@@ -180,6 +194,74 @@ class ReportResource extends Resource
                         }),
 
                 ]),
+            Section::make('Descrição das Atividades')
+                ->visible(fn () => self::canSee('descricao_atividades'))
+                ->schema([
+                    \Filament\Forms\Components\Repeater::make('atividades')
+                        ->label('3.1 Adicionar Atividade Estruturada')
+                        ->relationship('atividades')
+                        ->orderColumn('ordem')
+                        ->reorderableWithButtons()
+                        ->addActionLabel('Adicionar Atividade')
+                        ->grid(2)
+                        ->helperText('Clique em "Adicionar Atividade" para inserir itens.')
+                        ->schema([
+                            Select::make('tipo_atividade_id')
+                                ->label('Tipo de Atividade')
+                                ->options(fn () => \App\Models\TipoAtividade::orderBy('nome')->pluck('nome','id'))
+                                ->searchable()->reactive()->required()
+                                ->disabled(fn () => ! self::canFill('descricao_atividades'))
+                                ->afterStateUpdated(fn ($state, callable $set) => [
+                                    $set('situacao_atividade_id', null),
+                                    $set('medida_atividade_id', null),
+                                ]),
+
+                            Select::make('situacao_atividade_id')
+                                ->label('Situação')
+                                ->options(function (\Filament\Forms\Get $get) {
+                                    $tipoId = $get('tipo_atividade_id');
+                                    return $tipoId
+                                        ? \App\Models\SituacaoAtividade::where('tipo_atividade_id', $tipoId)->orderBy('nome')->pluck('nome','id')
+                                        : [];
+                                })
+                                ->searchable()->reactive()->required()
+                                ->disabled(fn () => ! self::canFill('descricao_atividades'))
+                                ->afterStateUpdated(fn ($state, callable $set) => $set('medida_atividade_id', null)),
+
+                            Select::make('medida_atividade_id')
+                                ->label('Medidas Adotadas')
+                                ->options(function (\Filament\Forms\Get $get) {
+                                    $sitId = $get('situacao_atividade_id');
+                                    return $sitId
+                                        ? \App\Models\MedidaAtividade::where('situacao_atividade_id', $sitId)->orderBy('nome')->pluck('nome','id')
+                                        : [];
+                                })
+                                ->searchable()->required()
+                                ->disabled(fn () => ! self::canFill('descricao_atividades')),
+
+                            \Filament\Forms\Components\TextInput::make('endereco')
+                                ->label('Endereço')
+                                ->placeholder('Insira o endereço...')
+                                ->columnSpanFull()->maxLength(255)
+                                ->disabled(fn () => ! self::canFill('descricao_atividades')),
+                        ])
+                        ->disabled(fn () => ! self::canFill('descricao_atividades')),
+
+                    \Filament\Forms\Components\Textarea::make('descricao_manual')
+                        ->label('3.2 Descrição Manual das Atividades')
+                        ->placeholder('Ex.: Rondas na área central, verificação de semáforos na zona leste, apoio a eventos, etc...')
+                        ->rows(6)
+                        // garante que o valor sempre entra/permanece no estado do form
+                        ->dehydrated(true)
+                        ->afterStateHydrated(function ($component, ?\App\Models\Report $record) {
+                            if ($record) {
+                                $component->state($record->descricao_manual);
+                            }
+                        })
+                        ->disabled(fn () => ! self::canFill('descricao_atividades')),
+
+                ]),
+
         ]);
     }
 

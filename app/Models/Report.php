@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 class Report extends Model
 {
     protected $fillable = [
-        'user_id', 'same_day', 'start_at', 'end_at', 'service_type', 'shift', 'meta',
+        'user_id', 'same_day', 'start_at', 'end_at', 'service_type', 'shift', 'meta','descricao_manual',
     ];
 
     protected $casts = [
@@ -16,6 +16,7 @@ class Report extends Model
         'start_at'  => 'datetime',
         'end_at'    => 'datetime',
         'meta'      => 'array',
+
     ];
 
     public function team(): BelongsToMany
@@ -27,4 +28,10 @@ class Report extends Model
     {
         return $this->belongsTo(User::class,'user_id');
     }
+
+    public function atividades()
+    {
+        return $this->hasMany(\App\Models\RelatorioAtividade::class, 'report_id')->orderBy('ordem');
+    }
+
 }
