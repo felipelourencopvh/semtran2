@@ -22,9 +22,14 @@ class User extends Authenticatable
      * @var list<string>
      */
     protected $fillable = [
+
         'name',
         'email',
         'password',
+        'department_id',
+        'telefone',
+        'matricula',
+        'nome_farda',
     ];
 
     /**
@@ -49,4 +54,9 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+    public function department()
+    {
+        return $this->belongsTo(\App\Models\Department::class, 'department_id');
+    }
+
 }

@@ -29,7 +29,6 @@ class ReportResource extends Resource
     protected static ?string $navigationIcon = 'heroicon-o-document-text';
     protected static ?string $navigationGroup = 'Operação';
 
-    // Helpers de permissão por seção
     protected static function canFill(string $key): bool
     {
         return auth()->user()?->can("report.section.$key.fill") ?? false;
@@ -44,7 +43,6 @@ class ReportResource extends Resource
     public static function form(Form $form): Form
     {
         return $form->schema([
-
             // Seção 1 — Informações Gerais
             Section::make('Informações Gerais')
                 ->visible(fn () => self::canSee('informacoes_gerais'))
@@ -62,7 +60,6 @@ class ReportResource extends Resource
                         })
                         ->disabled(fn () => ! self::canFill('informacoes_gerais')),
 
-                    // Mesmo dia ON
                     Grid::make(3)
                         ->visible(fn (Get $get) => $get('same_day') === true)
                         ->schema([
@@ -97,7 +94,6 @@ class ReportResource extends Resource
                                 ->disabled(fn () => ! self::canFill('informacoes_gerais')),
                         ]),
 
-                    // Mesmo dia OFF
                     Grid::make(4)
                         ->visible(fn (Get $get) => $get('same_day') === false)
                         ->schema([
@@ -135,7 +131,6 @@ class ReportResource extends Resource
                                 ->disabled(fn () => ! self::canFill('informacoes_gerais')),
                         ]),
 
-                    // Tipo / Turno
                     Grid::make(2)->schema([
                         Select::make('service_type')
                             ->label('Tipo de Serviço')
@@ -184,7 +179,7 @@ class ReportResource extends Resource
                         ->preload()
                         ->searchable()
                         ->disabled(fn () => ! self::canFill('equipe'))
-                        ->dehydrated(false) // não salva na tabela reports
+                        ->dehydrated(false)
                         ->afterStateHydrated(function (MultiSelect $component, ?Report $record) {
                             if ($record && $record->exists) {
                                 $component->state($record->team()->pluck('users.id')->all());
@@ -260,6 +255,7 @@ class ReportResource extends Resource
                 ]),
 
             // Seção 4 — Equipamentos Utilizados
+            // Seção 4 — Equipamentos Utilizados
             Section::make('Equipamentos Utilizados')
                 ->visible(fn () => self::canSee('equipamentos'))
                 ->schema([
@@ -307,14 +303,15 @@ class ReportResource extends Resource
                         ->reactive()
                         ->dehydrated(true)
                         ->afterStateHydrated(function (Toggle $component, ?Report $record) {
-                            if ($record) {
-                                $component->state((bool) $record->informar_dados_veiculo);
+                            if ($record && $record->exists) {
+                                // Marca como true se houver condutores ou se o campo informar_dados_veiculo for true
+                                $component->state($record->informar_dados_veiculo || $record->condutores()->exists());
                             }
                         })
                         ->disabled(fn () => ! self::canFill('equipamentos')),
                 ]),
 
-            // Seção 5 — Veículos e Condutores
+// Seção 5 — Veículos e Condutores
             Section::make('Veículos e Condutores')
                 ->visible(fn () => self::canSee('veiculos_condutores'))
                 ->schema([
@@ -324,57 +321,65 @@ class ReportResource extends Resource
                         ->orderColumn('ordem')
                         ->reorderableWithButtons()
                         ->addActionLabel('Adicionar outro motorista')
-                        ->visible(fn (Get $get) => (bool) $get('informar_dados_veiculo') === true)
+                        ->visible(fn (Get $get, ?Report $record) => (bool) $get('informar_dados_veiculo') || ($record && $record->condutores()->exists()))
+                        ->collapsed(fn (Get $get, ?Report $record) => ! ((bool) $get('informar_dados_veiculo') || ($record && $record->condutores()->exists())))
                         ->columns(2)
                         ->schema([
-                            // Veículo (filtrado por permissão do departamento)
                             Select::make('veiculo_id')
                                 ->label('Veículo / Placa')
                                 ->options(function () {
                                     $deptId = auth()->user()?->department_id;
-                                    if (! $deptId) return [];
-                                    return Veiculo::query()
+                                    if (!$deptId) return [];
+                                    return \App\Models\Veiculo::query()
                                         ->visiveisParaDepartamento($deptId)
                                         ->orderBy('placa')
                                         ->get()
                                         ->pluck('descricao', 'id');
                                 })
-                                ->searchable()->native(false)->required()
+                                ->getOptionLabelUsing(fn ($value) => \App\Models\Veiculo::find($value)?->descricao ?? null)
+                                ->searchable()
+                                ->native(false)
+                                ->required()
                                 ->disabled(fn () => ! self::canFill('veiculos_condutores')),
 
-                            // Motorista (somente integrantes da Equipe definida na Seção 2)
                             Select::make('motorista_id')
                                 ->label('Motorista')
-                                ->options(function (Get $get, ?Report $record) {
+                                ->options(function (Get $get, ?\App\Models\Report $record) {
                                     $ids = collect($get('../../team_ids') ?? [])
-                                        ->when(! $get('../../team_ids') && $record, fn ($c) => $record->team()->pluck('users.id'));
+                                        ->when(!$get('../../team_ids') && $record, fn($c) => $record->team()->pluck('users.id'));
                                     return $ids->isEmpty()
                                         ? []
-                                        : User::whereIn('id', $ids)->orderBy('name')->pluck('name', 'id');
+                                        : \App\Models\User::whereIn('id', $ids)->orderBy('name')->pluck('name', 'id');
                                 })
-                                ->searchable()->native(false)->required()->reactive()
+                                ->getOptionLabelUsing(fn ($value) => \App\Models\User::find($value)?->name ?? null)
+                                ->searchable()
+                                ->native(false)
+                                ->required()
+                                ->reactive()
                                 ->disabled(fn () => ! self::canFill('veiculos_condutores'))
                                 ->afterStateUpdated(function ($state, callable $set) {
-                                    $u = User::find($state);
+                                    $u = \App\Models\User::find($state);
                                     $mat = $u?->registration ?? $u?->matricula ?? null;
                                     $set('matricula', $mat);
                                 }),
 
-                            TextInput::make('matricula')
+                            \Filament\Forms\Components\TextInput::make('matricula')
                                 ->label('Matrícula do Motorista')
-                                ->placeholder('Puxada do cadastro')
                                 ->readOnly(),
 
-                            TextInput::make('odometro_inicial')
+                            \Filament\Forms\Components\TextInput::make('odometro_inicial')
                                 ->label('Odômetro Inicial (Km)')
-                                ->numeric()->minValue(0)
+                                ->numeric()
+                                ->minValue(0)
                                 ->dehydrated(true)
                                 ->disabled(fn () => ! self::canFill('veiculos_condutores')),
 
-                            TextInput::make('odometro_final')
+                            \Filament\Forms\Components\TextInput::make('odometro_final')
                                 ->label('Odômetro Final (Km)')
-                                ->numeric()->minValue(0)
-                                ->dehydrated(true)->reactive()
+                                ->numeric()
+                                ->minValue(0)
+                                ->dehydrated(true)
+                                ->reactive()
                                 ->disabled(fn () => ! self::canFill('veiculos_condutores')),
 
                             \Filament\Forms\Components\Placeholder::make('distancia')
@@ -386,7 +391,22 @@ class ReportResource extends Resource
                                 })
                                 ->columnSpanFull(),
                         ])
+                        ->afterStateHydrated(function (\Filament\Forms\Components\Repeater $component, ?Report $record) {
+                            if ($record && $record->exists) {
+                                $condutores = $record->condutores->map(function ($condutor) {
+                                    return [
+                                        'veiculo_id' => $condutor->veiculo_id,
+                                        'motorista_id' => $condutor->motorista_id,
+                                        'matricula' => \App\Models\User::find($condutor->motorista_id)?->matricula ?? null,
+                                        'odometro_inicial' => $condutor->odometro_inicial,
+                                        'odometro_final' => $condutor->odometro_final,
+                                    ];
+                                })->toArray();
+                                $component->state($condutores);
+                            }
+                        })
                         ->disabled(fn () => ! self::canFill('veiculos_condutores')),
+
                 ]),
         ]);
     }
@@ -403,6 +423,13 @@ class ReportResource extends Resource
                 TextColumn::make('shift')->label('Turno')
                     ->formatStateUsing(fn (string $state): string => ucfirst($state)),
                 TextColumn::make('author.name')->label('Criado por'),
+                TextColumn::make('author.roles.name')
+                    ->label('Perfis do Autor')
+                    ->formatStateUsing(function ($record) {
+                        return $record->author?->roles->pluck('name')->join(', ') ?? 'Nenhum';
+                    })
+                    ->toggleable()
+                    ->searchable(),
             ])
             ->actions([
                 Tables\Actions\EditAction::make()

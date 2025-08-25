@@ -38,6 +38,19 @@ class UserResource extends Resource
         return $form->schema([
             TextInput::make('name')->label('Nome')->required(),
             TextInput::make('email')->email()->unique(ignoreRecord: true)->required(),
+            TextInput::make('telefone')
+                ->label('Telefone')
+                ->placeholder('(69) 99999-9999')
+                ->maxLength(20),
+
+            TextInput::make('matricula')
+                ->label('Matrícula')
+                ->maxLength(30)
+                ->unique(ignoreRecord: true),
+
+            TextInput::make('nome_farda')
+                ->label('Nome da Farda')
+                ->maxLength(120),
 
             TextInput::make('password')
                 ->password()
@@ -47,8 +60,9 @@ class UserResource extends Resource
 
             Select::make('department_id')
                 ->label('Departamento')
-                ->options(Department::query()->pluck('name','id'))
+                ->relationship('department', 'name')
                 ->searchable()
+                ->preload()
                 ->required(),
 
             // Multi perfis (roles)
@@ -64,25 +78,37 @@ class UserResource extends Resource
     public static function table(Table $table): Table
     {
         return $table
+
             ->columns([
                 Tables\Columns\TextColumn::make('name')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('email')
+                    ->label('E-mail')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('email_verified_at')
-                    ->dateTime()
-                    ->sortable(),
-                Tables\Columns\TextColumn::make('created_at')
-                    ->dateTime()
+
+                Tables\Columns\TextColumn::make('telefone')
+                    ->label('Telefone')
+                    ->toggleable(),
+
+                Tables\Columns\TextColumn::make('matricula')
+                    ->label('Matrícula')
+                    ->toggleable(),
+
+                Tables\Columns\TextColumn::make('nome_farda')
+                    ->label('Nome da Farda')
+                    ->toggleable(),
+                Tables\Columns\TextColumn::make('department.name')
+                    ->label('Departamento')
                     ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('updated_at')
-                    ->dateTime()
-                    ->sortable()
-                    ->toggleable(isToggledHiddenByDefault: true),
-                Tables\Columns\TextColumn::make('department_id')
-                    ->numeric()
-                    ->sortable(),
+                    ->searchable(),
+                Tables\Columns\TextColumn::make('roles.name')
+                    ->label('Perfis')
+                    ->formatStateUsing(function ($record) {
+                        return $record->roles->pluck('name')->join(', ');
+                    })
+                    ->toggleable()
+                    ->searchable(),
+
             ])
             ->filters([
                 //
@@ -102,6 +128,10 @@ class UserResource extends Resource
         return [
             //
         ];
+    }
+    public function department()
+    {
+        return $this->belongsTo(\App\Models\Department::class, 'department_id');
     }
 
     public static function getPages(): array
