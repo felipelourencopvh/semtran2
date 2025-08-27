@@ -21,6 +21,8 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
+use Filament\Forms\Components\RichEditor;
+use Filament\Forms\Components\FileUpload;
 
 class ReportResource extends Resource
 {
@@ -408,6 +410,95 @@ class ReportResource extends Resource
                         ->disabled(fn () => ! self::canFill('veiculos_condutores')),
 
                 ]),
+            Section::make('Observações Gerais')
+                ->visible(fn () => self::canSee('observacoes'))
+                ->schema([
+                    RichEditor::make('observacoes')
+                        ->label('Observações Gerais')
+                        ->toolbarButtons([
+                            'bold','italic','underline','strike',
+                            'bulletList','orderedList','blockquote',
+                            'h2','h3','link','undo','redo',
+                        ])
+                        ->columnSpanFull()
+                        ->dehydrated(true)
+                        ->afterStateHydrated(function (RichEditor $c, ?\App\Models\Report $record) {
+                            if ($record) $c->state($record->observacoes);
+                        })
+                        ->disabled(fn () => ! self::canFill('observacoes')),
+                ]),
+
+// 7 — Agente Relator
+            Section::make('Agente Relator')
+                ->visible(fn () => self::canSee('relator'))
+                ->schema([
+                    Select::make('relator_id')
+                        ->label('Relator do relatório')
+                        ->options(function (\Filament\Forms\Get $get, ?\App\Models\Report $record) {
+                            // usa os usuários selecionados na seção Equipe
+                            $ids = collect($get('team_ids') ?? [])
+                                ->when(!$get('team_ids') && $record, fn($c) => $record->team()->pluck('users.id'));
+                            return $ids->isEmpty()
+                                ? []
+                                : \App\Models\User::whereIn('id', $ids)->orderBy('name')->pluck('name','id');
+                        })
+                        ->searchable()
+                        ->native(false)
+                        ->required()
+                        ->dehydrated(true)
+                        ->afterStateHydrated(function (Select $c, ?\App\Models\Report $record) {
+                            if ($record) $c->state($record->relator_id);
+                        })
+                        ->disabled(fn () => ! self::canFill('relator')),
+                ]),
+
+// 8 — Anexos (aparece/funciona melhor após salvar o relatório)
+            Section::make('Anexos')
+                ->visible(fn () => self::canSee('anexos'))
+                ->hiddenOn('create') // << não renderiza na tela de criação
+                ->schema([
+                    \Filament\Forms\Components\Repeater::make('anexos')
+                        ->relationship('anexos')
+                        ->label('Arquivos')
+                        ->addActionLabel('Adicionar arquivo')
+                        ->orderable(false)
+                        ->default([])                 // sem itens por padrão
+                        ->columns(2)
+                        ->disabled(fn () => ! self::canFill('anexos')) // só habilita para quem pode preencher
+                        ->schema([
+                            FileUpload::make('path')
+                                ->label('Arquivo')
+                                ->disk('public')
+                                // se quiser já salvar por relatório:
+                                ->directory(fn (? \App\Models\Report $record) => $record ? "reports/{$record->id}" : 'reports')
+                                ->preserveFilenames()
+                                ->openable()
+                                ->downloadable()
+                                ->previewable(true)
+                                ->multiple(false)      // 1 arquivo por item do repeater
+                                ->required(false)      // << remove a obrigatoriedade
+                                ->acceptedFileTypes([
+                                    'image/*', 'application/pdf',
+                                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                                    'application/msword',
+                                    'application/vnd.ms-excel',
+                                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                                    'text/plain',
+                                ]),
+
+                            \Filament\Forms\Components\TextInput::make('original_name')
+                                ->label('Nome original')
+                                ->maxLength(255),
+
+                            \Filament\Forms\Components\TextInput::make('mime')
+                                ->label('MIME')
+                                ->maxLength(120),
+
+                            \Filament\Forms\Components\TextInput::make('size')
+                                ->label('Tamanho (bytes)')
+                                ->numeric()->minValue(0),
+                        ]),
+                ]),
         ]);
     }
 
@@ -418,6 +509,8 @@ class ReportResource extends Resource
                 TextColumn::make('id')->sortable(),
                 TextColumn::make('start_at')->label('Início')->dateTime('d/m/Y H:i'),
                 TextColumn::make('end_at')->label('Fim')->dateTime('d/m/Y H:i'),
+                TextColumn::make('relator.name')->label('Relator')->toggleable(),
+                TextColumn::make('anexos_count')->label('Anexos')->counts('anexos')->toggleable(),
                 TextColumn::make('service_type')->label('Tipo')
                     ->formatStateUsing(fn (string $state): string => ucfirst($state)),
                 TextColumn::make('shift')->label('Turno')

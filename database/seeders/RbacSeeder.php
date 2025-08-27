@@ -43,6 +43,15 @@ class RbacSeeder extends Seeder
             // 5 – Veículos e Condutores (NOVA)
             'report.section.veiculos_condutores.view',
             'report.section.veiculos_condutores.fill',
+
+
+            'report.section.observacoes.view',
+            'report.section.observacoes.fill',
+            'report.section.relator.view',
+            'report.section.relator.fill',
+            'report.section.anexos.view',
+            'report.section.anexos.fill',
+
         ];
 
         // 3) Outras permissões do sistema
