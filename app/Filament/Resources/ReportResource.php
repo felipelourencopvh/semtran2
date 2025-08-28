@@ -23,6 +23,8 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\FileUpload;
+use Filament\Tables\Actions\Action;
+
 
 class ReportResource extends Resource
 {
@@ -523,13 +525,23 @@ class ReportResource extends Resource
                     })
                     ->toggleable()
                     ->searchable(),
+
             ])
+
             ->actions([
                 Tables\Actions\EditAction::make()
                     ->visible(fn () => auth()->user()->can('report.update')),
                 Tables\Actions\DeleteAction::make()
                     ->visible(fn () => auth()->user()->can('report.delete')),
+                Action::make('pdf')
+                    ->label('Baixar PDF')
+                    ->icon('heroicon-o-arrow-down-tray')
+                    ->color('gray')
+                    ->url(fn ($record) => route('reports.pdf', $record))
+                    ->openUrlInNewTab()
+                    ->visible(fn ($record) => auth()->user()->can('report.view'))
             ]);
+
     }
 
     public static function getPages(): array
