@@ -28,33 +28,100 @@
     <meta charset="utf-8">
     <title>Relatório Diário - #{{ $report->id }}</title>
     <style>
-        body{ font-family: DejaVu Sans, sans-serif; font-size: 12px; color:#111; }
-        h1,h2,h3{ margin: 0 0 6px; }
-        .muted{ color:#555; }
-        .section{ margin: 14px 0; }
-        .head{ text-align: center; border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 12px; }
-        .grid-2{ display: table; width: 100%; table-layout: fixed; }
-        .col{ display: table-cell; vertical-align: top; }
-        .mb-6{ margin-bottom: 6px; }
-        ul{ margin: 4px 0 0 16px; padding:0; }
-        .tag{ display:inline-block; padding:2px 6px; border:1px solid #333; border-radius:4px; font-size:11px; margin-right:6px; }
-        .hr{ border:0; border-top:1px solid #ddd; margin:10px 0; }
-
-        .head img {
-            display:block;
-            margin: 0 auto 8px auto;
+        body {
+            font-family: DejaVu Sans, sans-serif;
+            font-size: 12px;
+            color: #111;
+            background: #fff;
         }
 
+        .header {
+            text-align: center;
+            padding: 20px 10px;
+            border-bottom: 3px solid #000;
+            margin-bottom: 20px;
+        }
+        .logo {
+            display: block;
+            margin: 0 auto 12px auto;
+            max-height: 80px;
+        }
+
+        .header img {
+            max-height: 80px;
+            margin-bottom: 10px;
+        }
+
+        .section {
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            padding: 12px 14px;
+            margin-bottom: 16px;
+        }
+
+        h3 {
+            background: #f2f2f2;
+            padding: 6px 10px;
+            margin: -12px -14px 12px -14px;
+            font-size: 14px;
+            border-bottom: 1px solid #ccc;
+        }
+
+        .grid {
+            display: flex;
+            gap: 20px;
+        }
+
+        .grid > div {
+            flex: 1;
+        }
+
+        .field {
+            margin-bottom: 8px;
+        }
+
+        .field strong {
+            display: inline-block;
+            width: 130px;
+        }
+
+        ul {
+            padding-left: 20px;
+            margin: 0;
+        }
+
+        li {
+            margin-bottom: 6px;
+        }
+
+        .muted {
+            font-size: 11px;
+            color: #666;
+            text-align: right;
+            margin-top: 40px;
+        }
+
+        .odometro {
+            background: #f9f9f9;
+            padding: 6px 10px;
+            border-radius: 4px;
+            display: inline-block;
+            margin-top: 4px;
+        }
     </style>
+
 </head>
 <body>
 
-<div class="head">
-    <img src="{{ public_path('img/semtran.png') }}" alt="SEMTRAN" style="max-height:80px; margin-bottom:8px;">
-    <div><strong>PREFEITURA DE PORTO VELHO</strong></div>
+<div class="header">
+    <img src="{{ public_path('img/semtran.png') }}" alt="SEMTRAN" class="logo">
+    <h1 style="margin: 8px 0 2px 0;">PREFEITURA DE PORTO VELHO</h1>
     <div>SECRETARIA MUNICIPAL DE SEGURANÇA, TRÂNSITO E MOBILIDADE</div>
-    <div><strong>RELATÓRIO DIÁRIO - {{ Str::upper($dept) }}</strong></div>
+    <h2 style="margin-top: 6px; font-size: 14px; text-transform: uppercase;">
+        RELATÓRIO DIÁRIO - {{ Str::upper($dept) }}
+    </h2>
 </div>
+
 
 {{-- 1. Informações Gerais (mostra se houver datas/turno/tipo) --}}
 @if($report->start_at || $report->end_at || $report->service_type || $report->shift)
