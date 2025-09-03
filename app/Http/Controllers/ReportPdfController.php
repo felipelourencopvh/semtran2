@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Report;
 use Illuminate\Http\Request;
 use PDF;
+use App\Models\Department;
 
 class ReportPdfController extends Controller
 {
@@ -13,8 +14,10 @@ class ReportPdfController extends Controller
         $this->authorize('view', $report);
 
         $report->load([
+            'author.department',       // << AQUI
+            'relator.department',      // << AQUI
+        //    'department',              // << se report tiver department_id
             'author.roles',
-            'relator',
             'team',
             'atividades.tipo',
             'atividades.situacao',
@@ -25,12 +28,7 @@ class ReportPdfController extends Controller
             'anexos',
         ]);
 
-        $pdf = PDF::loadView('reports.pdf', [
-            'report' => $report,
-        ])->setPaper('a4');
-
-        $filename = 'relatorio-'.$report->id.'.pdf';
-
-        return $pdf->stream($filename);
+        $pdf = \PDF::loadView('reports.pdf', compact('report'))->setPaper('a4');
+        return $pdf->stream('relatorio-'.$report->id.'.pdf');
     }
 }

@@ -1,10 +1,27 @@
 @php
     use Illuminate\Support\Str;
 
-    // Helpers rápidos
     $fmtData = fn($dt) => optional($dt)->timezone(config('app.timezone'))->format('d/m/Y');
     $fmtHora = fn($dt) => optional($dt)->timezone(config('app.timezone'))->format('H:i');
+
+    $dept =
+        // Autor
+        ($report->author?->department?->sigla
+        ?? $report->author?->department?->name
+        ?? $report->author?->department?->nome)
+        // Relator
+        ?? ($report->relator?->department?->sigla
+        ??  $report->relator?->department?->name
+        ??  $report->relator?->department?->nome)
+        // Report (opcional)
+        ?? ($report->department?->sigla
+        ??  $report->department?->name
+        ??  $report->department?->nome)
+        // Fallback
+        ?? 'DEPARTAMENTO';
 @endphp
+
+
     <!doctype html>
 <html lang="pt-br">
 <head>
@@ -22,14 +39,21 @@
         ul{ margin: 4px 0 0 16px; padding:0; }
         .tag{ display:inline-block; padding:2px 6px; border:1px solid #333; border-radius:4px; font-size:11px; margin-right:6px; }
         .hr{ border:0; border-top:1px solid #ddd; margin:10px 0; }
+
+        .head img {
+            display:block;
+            margin: 0 auto 8px auto;
+        }
+
     </style>
 </head>
 <body>
 
 <div class="head">
+    <img src="{{ public_path('img/semtran.png') }}" alt="SEMTRAN" style="max-height:80px; margin-bottom:8px;">
     <div><strong>PREFEITURA DE PORTO VELHO</strong></div>
     <div>SECRETARIA MUNICIPAL DE SEGURANÇA, TRÂNSITO E MOBILIDADE</div>
-    <div><strong>RELATÓRIO DIÁRIO - DICS</strong></div>
+    <div><strong>RELATÓRIO DIÁRIO - {{ Str::upper($dept) }}</strong></div>
 </div>
 
 {{-- 1. Informações Gerais (mostra se houver datas/turno/tipo) --}}

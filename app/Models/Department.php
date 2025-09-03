@@ -10,5 +10,11 @@ class Department extends Model
     use HasFactory;
 
     protected $fillable = ['name', 'description'];
+
+    public function getDisplayNameAttribute()
+    {
+        return $this->sigla ?: ($this->name ?: $this->nome);
+    }
+
 }
 
