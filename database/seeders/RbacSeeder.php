@@ -20,6 +20,7 @@ class RbacSeeder extends Seeder
         // 1) Permissões base (Relatórios)
         $reportPerms = [
             'report.view', 'report.create', 'report.update', 'report.delete',
+            'report.archive', 'report.restore', 'report.viewArchived',
         ];
 
         // 2) Permissões de seções do relatório
@@ -58,6 +59,7 @@ class RbacSeeder extends Seeder
         $systemPerms = [
             'user.view', 'user.create', 'user.update', 'user.delete',
             'department.view', 'department.create', 'department.update', 'department.delete',
+
         ];
 
         // 4) (Opcional) CRUD do cadastro de veículos via Filament Resource
@@ -107,8 +109,9 @@ class RbacSeeder extends Seeder
             'report.section.veiculos_condutores.view',
             'report.section.veiculos_condutores.fill',
 
-            // veículos (se quiser liberar o cadastro para gestores)
-            // 'vehicle.view','vehicle.create','vehicle.update',
+            'report.viewArchived', 'report.archive', 'report.restore',
+
+
         ])->get();
         $gestor->syncPermissions($gestorPerms);
 

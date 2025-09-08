@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 
 class Report extends Model
@@ -22,6 +23,10 @@ class Report extends Model
         'meta'      => 'array',
 
     ];
+
+    use SoftDeletes;
+
+    protected $table = 'reports';
 
     public function team(): BelongsToMany
     {

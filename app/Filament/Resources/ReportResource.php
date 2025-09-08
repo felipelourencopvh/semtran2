@@ -24,12 +24,26 @@ use Filament\Tables\Table;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\FileUpload;
 use Filament\Tables\Actions\Action;
+use Filament\Tables\Actions\RestoreAction;
+use Filament\Tables\Filters\TrashedFilter;
+use App\Filament\Resources\ReportResource\Pages\ListArquivadosReports;
+use Filament\Tables\Actions\BulkAction;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Hash;                  // para verificar a senha
+use Illuminate\Validation\ValidationException;        // para erro de senha
+use Illuminate\Support\Collection;
+use Filament\Navigation\NavigationItem;
+
+
 
 
 class ReportResource extends Resource
 {
     protected static ?string $model = Report::class;
     protected static ?string $navigationLabel = 'Relatórios';
+    protected static ?string $modelLabel = 'Relatório de Atividade SEMTRAN';
+    protected static ?string $pluralModelLabel = 'Relatórios de Atividade SEMTRAN';
+
     protected static ?string $navigationIcon = 'heroicon-o-document-text';
     protected static ?string $navigationGroup = 'Operação';
 
@@ -258,7 +272,6 @@ class ReportResource extends Resource
                         ->disabled(fn () => ! self::canFill('descricao_atividades')),
                 ]),
 
-            // Seção 4 — Equipamentos Utilizados
             // Seção 4 — Equipamentos Utilizados
             Section::make('Equipamentos Utilizados')
                 ->visible(fn () => self::canSee('equipamentos'))
@@ -513,43 +526,143 @@ class ReportResource extends Resource
                 TextColumn::make('end_at')->label('Fim')->dateTime('d/m/Y H:i'),
                 TextColumn::make('relator.name')->label('Relator')->toggleable(),
                 TextColumn::make('anexos_count')->label('Anexos')->counts('anexos')->toggleable(),
-                TextColumn::make('service_type')->label('Tipo')
-                    ->formatStateUsing(fn (string $state): string => ucfirst($state)),
-                TextColumn::make('shift')->label('Turno')
-                    ->formatStateUsing(fn (string $state): string => ucfirst($state)),
+                TextColumn::make('service_type')
+                    ->label('Tipo')
+                    ->formatStateUsing(fn (string $state) => ucfirst($state ?? '')),
+
+                TextColumn::make('shift')
+                    ->label('Turno')
+                    ->formatStateUsing(fn (string $state) => ucfirst($state ?? '')),
                 TextColumn::make('author.name')->label('Criado por'),
                 TextColumn::make('author.roles.name')
                     ->label('Perfis do Autor')
-                    ->formatStateUsing(function ($record) {
-                        return $record->author?->roles->pluck('name')->join(', ') ?? 'Nenhum';
-                    })
+                    ->formatStateUsing(fn ($record) => $record->author?->roles->pluck('name')->join(', ') ?? 'Nenhum')
                     ->toggleable()
                     ->searchable(),
-
             ])
+
+//            ->filters([
+//                \Filament\Tables\Filters\TrashedFilter::make()
+//                    ->label('Arquivados')
+//                    ->visible(fn () => auth()->user()->can('report.viewArchived')),
+//            ])
+
 
             ->actions([
                 Tables\Actions\EditAction::make()
                     ->visible(fn () => auth()->user()->can('report.update')),
-                Tables\Actions\DeleteAction::make()
-                    ->visible(fn () => auth()->user()->can('report.delete')),
-                Action::make('pdf')
+
+                Action::make('downloadPdf')
                     ->label('Baixar PDF')
                     ->icon('heroicon-o-arrow-down-tray')
                     ->color('gray')
                     ->url(fn ($record) => route('reports.pdf', $record))
                     ->openUrlInNewTab()
-                    ->visible(fn ($record) => auth()->user()->can('report.view'))
-            ]);
+                    ->visible(fn () => auth()->user()->can('report.view')),
 
+                // ARQUIVAR (pede senha)
+                Action::make('archive')
+                    ->label('Arquivar')
+                    ->icon('heroicon-o-archive-box')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalHeading('Arquivar relatório')
+                    ->modalDescription('Confirme sua senha para arquivar este relatório.')
+                    ->form([
+                        TextInput::make('password')
+                            ->label('Sua senha')
+                            ->password()
+                            ->required(),
+                    ])
+                    ->action(function ($record, array $data) {
+                        if (! Hash::check($data['password'], auth()->user()->password)) {
+                            throw ValidationException::withMessages([
+                                'password' => 'Senha incorreta.',
+                            ]);
+                        }
+                        $record->delete(); // soft delete
+                    })
+                    ->visible(fn () => auth()->user()->can('report.archive')),
+
+                // DESARQUIVAR (aparece só quando estiver arquivado)
+                RestoreAction::make('restore')
+                    ->label('Desarquivar')
+                    ->color('success')
+                    ->visible(fn ($record) => method_exists($record, 'trashed') && $record->trashed()
+                        && auth()->user()->can('report.restore')),
+            ])
+
+            ->bulkActions([
+                \Filament\Tables\Actions\BulkAction::make('archiveSelected')
+                    ->label('Arquivar selecionados')
+                    ->icon('heroicon-o-archive-box')
+                    ->color('warning')
+                    ->requiresConfirmation()
+                    ->modalHeading('Arquivar selecionados')
+                    ->modalDescription('Confirme sua senha para arquivar os registros selecionados.')
+                    ->form([
+                        TextInput::make('password')
+                            ->label('Sua senha')
+                            ->password()
+                            ->required(),
+                    ])
+                    ->action(function (Collection $records, array $data) {
+                        if (! Hash::check($data['password'], auth()->user()->password)) {
+                            throw ValidationException::withMessages([
+                                'password' => 'Senha incorreta.',
+                            ]);
+                        }
+                        $records->each->delete();
+                    })
+                    ->visible(fn () => auth()->user()->can('report.archive')),
+            ]);
     }
 
     public static function getPages(): array
     {
         return [
-            'index'  => Pages\ListReports::route('/'),
-            'create' => Pages\CreateReport::route('/create'),
-            'edit'   => Pages\EditReport::route('/{record}/edit'),
+            'index'       => Pages\ListReports::route('/'),
+            'create'      => Pages\CreateReport::route('/create'),
+            'edit'        => Pages\EditReport::route('/{record}/edit'),
+            // nova rota
+            'arquivados'  => ListArquivadosReports::route('/arquivados'),
         ];
     }
+
+
+    public static function getNavigationItems(): array
+    {
+        $items = [];
+
+        // 1) Relatórios (ativos)
+        if (auth()->user()?->can('report.view')) {
+            $items[] = NavigationItem::make('Relatórios')
+                ->group(static::getNavigationGroup())
+                ->icon('heroicon-o-document-text')
+                ->sort(2)
+                ->url(static::getUrl('index'))
+                ->isActiveWhen(fn () =>
+                    request()->routeIs(static::getRouteBaseName().'.index')
+                    || request()->routeIs(static::getRouteBaseName().'.create')
+                    || request()->routeIs(static::getRouteBaseName().'.edit')
+                );
+        }
+
+        // 2) Arquivados
+        if (auth()->user()?->can('report.viewArchived')) {
+            $items[] = NavigationItem::make('Arquivados')
+                ->group(static::getNavigationGroup())
+                ->icon('heroicon-o-archive-box')
+                ->sort(3)
+                ->url(static::getUrl('arquivados'))
+                ->isActiveWhen(fn () =>
+                request()->routeIs(static::getRouteBaseName().'.arquivados')
+                );
+        }
+
+        return $items;
+    }
+
+
+
 }
